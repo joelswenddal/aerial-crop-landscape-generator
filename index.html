@@ -243,7 +243,7 @@
 
 <header>
   <h1>Aerial Crop Field Generator</h1>
-  <p>Perspective reference tool for generating abstract aerial agricultural landscapes.</p>
+  <p>Perspective reference tool for painting aerial agricultural landscapes.</p>
 </header>
 
 <div class="main">
@@ -329,23 +329,58 @@ function tiltLabel(v) {
   return (v > 0 ? '▼ fwd ' : '▲ back ') + Math.abs(v).toFixed(2);
 }
 
-function drawCircle(proj, cx, cy, rg, pivotAngle, hasWedge, wedgeStart, wedgeArc, isNadir, doFill, doArms, dark) {
+// ── Circle color helpers (shared logic with aerial_fly.html) ──────────────────
+
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+function shiftRgb(r, g, b, amt) {
+  return [
+    Math.max(0, Math.min(255, r + amt)),
+    Math.max(0, Math.min(255, g + amt)),
+    Math.max(0, Math.min(255, b + amt))
+  ];
+}
+
+// drawCircle — tonal fill model.
+// The circle is a filled region lighter or darker than its field color (circleShift),
+// not an outlined shape. The nadir circle gets a subtle highlight ring instead of
+// a colored stroke so it's still identifiable without breaking the tonal logic.
+function drawCircle(proj, cx, cy, rg, pivotAngle, hasWedge, wedgeStart, wedgeArc, isNadir, doFill, doArms, dark, fieldColor, circleShift) {
+  const [r, g, b] = hexToRgb(fieldColor);
+  const [cr, cg, cb] = shiftRgb(r, g, b, circleShift);
+  const circleFill  = `rgb(${cr},${cg},${cb})`;
+  const [er, eg, eb] = shiftRgb(cr, cg, cb, -18);
+  const edgeStroke  = `rgba(${er},${eg},${eb},0.55)`;
+  const [rr2, rg2, rb2] = shiftRgb(r, g, b, circleShift * 0.5);
+  const ringStroke  = `rgba(${rr2},${rg2},${rb2},0.35)`;
+
   const N = 64;
   const pts = [];
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2;
     pts.push(proj(cx + Math.cos(a) * rg, cy + Math.sin(a) * rg));
   }
+
+  // Fill
   ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < N; i++) ctx.lineTo(pts[i].x, pts[i].y);
   ctx.closePath();
+  ctx.fillStyle = circleFill;
+  ctx.fill();
+
+  // Edge — nadir circle gets a slightly more visible ring so it's still identifiable
   ctx.strokeStyle = isNadir
-    ? (dark ? 'rgba(220,220,160,0.92)' : 'rgba(90,55,5,0.88)')
-    : (dark ? 'rgba(155,205,235,0.70)' : 'rgba(18,62,128,0.64)');
-  ctx.lineWidth = isNadir ? 2.2 : 1.4;
+    ? (dark ? 'rgba(220,220,160,0.6)' : 'rgba(80,50,5,0.5)')
+    : edgeStroke;
+  ctx.lineWidth = isNadir ? 1.2 : 0.7;
   ctx.stroke();
 
-  if (hasWedge && doFill && !isNadir) {
+  // Wedge shadow — darker sector within the circle
+  if (hasWedge && doFill) {
+    const [wr, wg, wb] = shiftRgb(cr, cg, cb, -35);
     const cp = proj(cx, cy);
     ctx.beginPath(); ctx.moveTo(cp.x, cp.y);
     for (let i = 0; i <= 24; i++) {
@@ -354,10 +389,11 @@ function drawCircle(proj, cx, cy, rg, pivotAngle, hasWedge, wedgeStart, wedgeArc
       ctx.lineTo(p.x, p.y);
     }
     ctx.closePath();
-    ctx.fillStyle = dark ? 'rgba(10,18,14,0.48)' : 'rgba(35,25,15,0.20)';
+    ctx.fillStyle = `rgba(${wr},${wg},${wb},0.82)`;
     ctx.fill();
   }
 
+  // Concentric tonal rings
   if (doFill) {
     for (let ri = 1; ri <= 3; ri++) {
       const rr = rg * (ri / 4);
@@ -368,21 +404,23 @@ function drawCircle(proj, cx, cy, rg, pivotAngle, hasWedge, wedgeStart, wedgeArc
         if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
       }
       ctx.closePath();
-      ctx.strokeStyle = dark ? 'rgba(155,205,235,0.14)' : 'rgba(18,62,128,0.09)';
+      ctx.strokeStyle = ringStroke;
       ctx.lineWidth = 0.5; ctx.stroke();
     }
   }
 
+  // Pivot arm — darkened version of circle fill color
   if (doArms) {
+    const [ar, ag, ab] = shiftRgb(cr, cg, cb, -45);
     const cp = proj(cx, cy);
     const ep = proj(cx + Math.cos(pivotAngle) * rg * 0.9, cy + Math.sin(pivotAngle) * rg * 0.9);
     ctx.save();
-    ctx.strokeStyle = dark ? 'rgba(215,188,95,0.58)' : 'rgba(105,72,8,0.52)';
+    ctx.strokeStyle = `rgba(${ar},${ag},${ab},0.75)`;
     ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
     ctx.beginPath(); ctx.moveTo(cp.x, cp.y); ctx.lineTo(ep.x, ep.y); ctx.stroke();
     ctx.restore();
     ctx.beginPath(); ctx.arc(cp.x, cp.y, 2, 0, Math.PI * 2);
-    ctx.fillStyle = dark ? 'rgba(215,188,95,0.72)' : 'rgba(105,72,8,0.66)';
+    ctx.fillStyle = `rgba(${ar},${ag},${ab},0.88)`;
     ctx.fill();
   }
 }
@@ -535,6 +573,7 @@ function buildAndDraw() {
         color: R.pick(PAL), color2: R.pick(PAL),
         rg: Math.min(cw, gy1 - gy0) * 0.43,
         dist,
+        circleShift: R.pick([-65,-50,-38,-28,-18, 18,28,40,55,68]),
         pivotAngle: R.range(0, Math.PI * 2),
         hasWedge: R.next() < 0.38,
         wedgeStart: R.range(0, Math.PI * 2),
@@ -621,12 +660,12 @@ function buildAndDraw() {
 
     if (f.hasCircle) {
       drawCircle(proj, cxc, cyc, rg, f.pivotAngle, f.hasWedge, f.wedgeStart, f.wedgeArc,
-        f === nearestField, doFill, doArms, dark);
+        f === nearestField, doFill, doArms, dark, f.color, f.circleShift);
     }
     if (f.isMulti) {
       for (const sc of f.subCircles) {
         drawCircle(proj, sc.cx, sc.cy, sc.rg, sc.pivotAngle, sc.hasWedge, sc.wedgeStart, sc.wedgeArc,
-          false, doFill, doArms, dark);
+          false, doFill, doArms, dark, f.color, f.circleShift);
       }
     }
   }
