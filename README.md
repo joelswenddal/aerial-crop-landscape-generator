@@ -1,6 +1,6 @@
 # Aerial Crop Field Generator
 
-A perspective reference tool for painting aerial agricultural landscapes. The goal is to generate plausible, semi-abstract compositions of crop fields — including irrigated circles, rectangular plots, and irregular polygons — as they would appear from a light aircraft looking slightly downward, with correct perspective distortion throughout.
+A perspective reference tool for generating abstract aerial agricultural landscape designs. The goal is to generate plausible, semi-abstract compositions of crop fields — including irrigated circles, rectangular plots, and irregular polygons — as they would appear from a light aircraft looking slightly downward, with correct perspective distortion throughout.
 
 No libraries. No build step. One HTML file, open in any browser.
 
