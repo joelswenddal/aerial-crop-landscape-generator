@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aerial Crop Field Generator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f0ede4;
+    --surface: #e8e4da;
+    --border: rgba(0,0,0,0.12);
+    --border-strong: rgba(0,0,0,0.22);
+    --text: #1a1a18;
+    --text-muted: #5a5850;
+    --canvas-bg: #e8e4da;
+    --btn-bg: transparent;
+    --btn-hover: rgba(0,0,0,0.06);
+    --input-bg: transparent;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141412;
+      --surface: #1c1c1a;
+      --border: rgba(255,255,255,0.1);
+      --border-strong: rgba(255,255,255,0.2);
+      --text: #e8e4da;
+      --text-muted: #888078;
+      --canvas-bg: #181816;
+      --btn-bg: transparent;
+      --btn-hover: rgba(255,255,255,0.07);
+      --input-bg: transparent;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+  }
+
+  header {
+    width: 100%;
+    max-width: 900px;
+    margin-bottom: 18px;
+  }
+
+  header h1 {
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  header p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .main {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  canvas {
+    width: 100%;
+    border-radius: 6px;
+    border: 0.5px solid var(--border);
+    display: block;
+    background: var(--canvas-bg);
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 24px;
+  }
+
+  @media (max-width: 560px) {
+    .controls { grid-template-columns: 1fr; }
+  }
+
+  .ctrl {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .ctrl label {
+    min-width: 148px;
+    flex-shrink: 0;
+  }
+
+  .ctrl input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .ctrl input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--text);
+    border: none;
+    cursor: pointer;
+  }
+
+  .ctrl input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--text);
+    border: none;
+    cursor: pointer;
+  }
+
+  .ctrl .val {
+    min-width: 80px;
+    text-align: right;
+    font-size: 12px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  button {
+    font-size: 13px;
+    padding: 7px 18px;
+    border-radius: 6px;
+    border: 0.5px solid var(--border-strong);
+    background: var(--btn-bg);
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.12s;
+  }
+
+  button:hover { background: var(--btn-hover); }
+  button:active { opacity: 0.7; }
+
+  .tog-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .tog {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .tog input[type=checkbox] {
+    width: 14px; height: 14px;
+    cursor: pointer;
+    accent-color: var(--text);
+  }
+
+  #info {
+    font-size: 12px;
+    color: var(--text-muted);
+    min-height: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #seed-display {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .seed-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .seed-row input[type=number] {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    border: 0.5px solid var(--border-strong);
+    background: var(--input-bg);
+    color: var(--text);
+    width: 110px;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .seed-row input[type=number]:focus {
+    outline: 1px solid var(--text-muted);
+  }
+
+  .seed-row label {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  hr {
+    border: none;
+    border-top: 0.5px solid var(--border);
+  }
+
+  footer {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Aerial Crop Field Generator</h1>
+  <p>Perspective reference tool for painting aerial agricultural landscapes.</p>
+</header>
+
+<div class="main">
+  <canvas id="c"></canvas>
+
+  <div class="btn-row">
+    <button onclick="randomize()">New composition</button>
+    <button onclick="draw()">Redraw same</button>
+    <button onclick="exportPNG()">Export PNG</button>
+  </div>
+
+  <div class="seed-row">
+    <label for="seedInput">Seed:</label>
+    <input type="number" id="seedInput" value="0" min="0" max="999999" step="1">
+    <button onclick="applySeed()">Apply seed</button>
+    <span id="info"></span>
+  </div>
+
+  <hr>
+
+  <div class="controls">
+    <div class="ctrl"><label>Altitude</label><input type="range" id="camH" min="0.5" max="8" value="3" step="0.05"><span class="val" id="camH-v">3.00×</span></div>
+    <div class="ctrl"><label>Tilt</label><input type="range" id="tilt" min="-1" max="1" value="0.35" step="0.01"><span class="val" id="tilt-v">▼ fwd 0.35</span></div>
+    <div class="ctrl"><label>Nadir X</label><input type="range" id="nadirX" min="0.05" max="0.95" value="0.5" step="0.01"><span class="val" id="nadirX-v">0.50</span></div>
+    <div class="ctrl"><label>Nadir Y</label><input type="range" id="nadirY" min="0.05" max="0.95" value="0.55" step="0.01"><span class="val" id="nadirY-v">0.55</span></div>
+    <div class="ctrl"><label>Terrain warp</label><input type="range" id="warpAmt" min="0" max="1" value="0.22" step="0.01"><span class="val" id="warpAmt-v">0.22</span></div>
+    <div class="ctrl"><label>Circle density</label><input type="range" id="density" min="0.1" max="1" value="0.65" step="0.05"><span class="val" id="density-v">0.65</span></div>
+    <div class="ctrl"><label>Multi-circle freq</label><input type="range" id="multiFreq" min="0" max="0.6" value="0.22" step="0.01"><span class="val" id="multiFreq-v">0.22</span></div>
+  </div>
+
+  <hr>
+
+  <div class="tog-row">
+    <label class="tog"><input type="checkbox" id="tog-arms" checked> Pivot arms</label>
+    <label class="tog"><input type="checkbox" id="tog-fill" checked> Circle fill / rings</label>
+    <label class="tog"><input type="checkbox" id="tog-warp" checked> Terrain warp</label>
+    <label class="tog"><input type="checkbox" id="tog-nadir" checked> Show nadir</label>
+  </div>
+
+  <footer>
+    Drag any slider to update live &nbsp;·&nbsp; Use seed input to save and recall compositions
+  </footer>
+</div>
+
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let seed = Math.floor(Math.random() * 999999);
+let fields = [];
+
+function resize() {
+  const w = Math.min(cv.parentElement.clientWidth, 900);
+  cv.width = w;
+  cv.height = Math.round(w * 0.68);
+  draw();
+}
+
+class Rand {
+  constructor(s) { this.s = (s | 0) || 1; }
+  next() { this.s = (this.s * 16807) % 2147483647; return (this.s - 1) / 2147483646; }
+  range(a, b) { return a + (b - a) * this.next(); }
+  int(a, b) { return Math.floor(this.range(a, b + 0.9999)); }
+  pick(arr) { return arr[Math.floor(this.next() * arr.length)]; }
+}
+
+function makeProj(W, H, camH, tilt, nadirSx, nadirSy, warpAmt, doWarp) {
+  const scale = W / 2.0;
+  const F = camH * scale;
+  const sinAlpha = tilt / (camH + 0.5);
+  return function(gx_raw, gy_raw) {
+    let gx = gx_raw, gy = gy_raw;
+    if (doWarp && warpAmt > 0) {
+      gx += Math.sin(gy_raw * Math.PI * 1.3 + gx_raw * 0.8 + 0.5) * warpAmt * 0.055;
+      gy += Math.cos(gx_raw * Math.PI * 1.1 + gy_raw * 0.6 + 1.2) * warpAmt * 0.038;
+    }
+    const depth = Math.max(0.01, camH + gy * sinAlpha);
+    return { x: nadirSx + (gx / depth) * F, y: nadirSy + (gy / depth) * F };
+  };
+}
+
+function tiltLabel(v) {
+  if (Math.abs(v) < 0.03) return 'nadir (0.00)';
+  return (v > 0 ? '▼ fwd ' : '▲ back ') + Math.abs(v).toFixed(2);
+}
+
+function drawCircle(proj, cx, cy, rg, pivotAngle, hasWedge, wedgeStart, wedgeArc, isNadir, doFill, doArms, dark) {
+  const N = 64;
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    pts.push(proj(cx + Math.cos(a) * rg, cy + Math.sin(a) * rg));
+  }
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < N; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+  ctx.strokeStyle = isNadir
+    ? (dark ? 'rgba(220,220,160,0.92)' : 'rgba(90,55,5,0.88)')
+    : (dark ? 'rgba(155,205,235,0.70)' : 'rgba(18,62,128,0.64)');
+  ctx.lineWidth = isNadir ? 2.2 : 1.4;
+  ctx.stroke();
+
+  if (hasWedge && doFill && !isNadir) {
+    const cp = proj(cx, cy);
+    ctx.beginPath(); ctx.moveTo(cp.x, cp.y);
+    for (let i = 0; i <= 24; i++) {
+      const a = wedgeStart + (i / 24) * wedgeArc;
+      const p = proj(cx + Math.cos(a) * rg, cy + Math.sin(a) * rg);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = dark ? 'rgba(10,18,14,0.48)' : 'rgba(35,25,15,0.20)';
+    ctx.fill();
+  }
+
+  if (doFill) {
+    for (let ri = 1; ri <= 3; ri++) {
+      const rr = rg * (ri / 4);
+      ctx.beginPath();
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        const p = proj(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+        if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = dark ? 'rgba(155,205,235,0.14)' : 'rgba(18,62,128,0.09)';
+      ctx.lineWidth = 0.5; ctx.stroke();
+    }
+  }
+
+  if (doArms) {
+    const cp = proj(cx, cy);
+    const ep = proj(cx + Math.cos(pivotAngle) * rg * 0.9, cy + Math.sin(pivotAngle) * rg * 0.9);
+    ctx.save();
+    ctx.strokeStyle = dark ? 'rgba(215,188,95,0.58)' : 'rgba(105,72,8,0.52)';
+    ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(cp.x, cp.y); ctx.lineTo(ep.x, ep.y); ctx.stroke();
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(cp.x, cp.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = dark ? 'rgba(215,188,95,0.72)' : 'rgba(105,72,8,0.66)';
+    ctx.fill();
+  }
+}
+
+function subCircleLayout(gx0, gy0, gx1, gy1, n, R) {
+  const bw = gx1 - gx0, bh = gy1 - gy0;
+  const result = [];
+  if (n === 2) {
+    if (bw >= bh) {
+      const rg = Math.min(bw / 2, bh) * 0.44;
+      result.push({ cx: gx0 + bw * 0.25, cy: gy0 + bh * 0.5, rg });
+      result.push({ cx: gx0 + bw * 0.75, cy: gy0 + bh * 0.5, rg });
+    } else {
+      const rg = Math.min(bw, bh / 2) * 0.44;
+      result.push({ cx: gx0 + bw * 0.5, cy: gy0 + bh * 0.25, rg });
+      result.push({ cx: gx0 + bw * 0.5, cy: gy0 + bh * 0.75, rg });
+    }
+  } else if (n === 3) {
+    const flip = R.next() < 0.5;
+    const rg = Math.min(bw / 2, bh / 2) * 0.42;
+    if (flip) {
+      result.push({ cx: gx0 + bw * 0.25, cy: gy0 + bh * 0.28, rg });
+      result.push({ cx: gx0 + bw * 0.75, cy: gy0 + bh * 0.28, rg });
+      result.push({ cx: gx0 + bw * 0.5,  cy: gy0 + bh * 0.72, rg });
+    } else {
+      result.push({ cx: gx0 + bw * 0.5,  cy: gy0 + bh * 0.28, rg });
+      result.push({ cx: gx0 + bw * 0.25, cy: gy0 + bh * 0.72, rg });
+      result.push({ cx: gx0 + bw * 0.75, cy: gy0 + bh * 0.72, rg });
+    }
+  } else {
+    const rg = Math.min(bw / 2, bh / 2) * 0.44;
+    result.push({ cx: gx0 + bw * 0.25, cy: gy0 + bh * 0.25, rg });
+    result.push({ cx: gx0 + bw * 0.75, cy: gy0 + bh * 0.25, rg });
+    result.push({ cx: gx0 + bw * 0.25, cy: gy0 + bh * 0.75, rg });
+    result.push({ cx: gx0 + bw * 0.75, cy: gy0 + bh * 0.75, rg });
+  }
+  return result;
+}
+
+const PAL_L = ['#bfbba8','#b2bb9e','#a5b496','#bdb08c','#b0beac','#cec6a0','#a2acbf','#bcb29c','#a8b8a8','#c2b29a','#9eb2ac','#b6baa2','#849880','#948878','#ac9e80','#6e8490','#647065','#827870','#6a7278','#525e50'];
+const PAL_D = ['#2c3228','#363c2c','#2a3632','#3c322a','#343c2a','#263232','#342e24','#2a3240','#202a22','#322a22','#2a2a34','#223228','#3e3620','#263e26','#32302a','#1e2e36','#18201a','#2a1e16','#1e262c','#141e18'];
+
+function buildAndDraw() {
+  const W = cv.width, H = cv.height;
+  const camH     = +document.getElementById('camH').value;
+  const tilt     = +document.getElementById('tilt').value;
+  const nadirSx  = +document.getElementById('nadirX').value * W;
+  const nadirSy  = +document.getElementById('nadirY').value * H;
+  const warpAmt  = +document.getElementById('warpAmt').value;
+  const density  = +document.getElementById('density').value;
+  const multiFreq= +document.getElementById('multiFreq').value;
+  const doWarp   = document.getElementById('tog-warp').checked;
+  const doArms   = document.getElementById('tog-arms').checked;
+  const doFill   = document.getElementById('tog-fill').checked;
+  const showNadir= document.getElementById('tog-nadir').checked;
+  const dark     = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const PAL      = dark ? PAL_D : PAL_L;
+
+  ctx.fillStyle = dark ? '#181816' : '#e8e4da';
+  ctx.fillRect(0, 0, W, H);
+
+  const proj  = makeProj(W, H, camH, tilt, nadirSx, nadirSy, warpAmt, doWarp);
+  const scale = W / 2.0;
+  const F = camH * scale;
+  const sinAlpha = tilt / (camH + 0.5);
+
+  // Inverse projection: screen (sx, sy) → ground (gx, gy), ignoring warp.
+  // From makeProj: sx = nadirSx + (gx/depth)*F,  sy = nadirSy + (gy/depth)*F
+  // where depth = camH + gy*sinAlpha
+  // So: (sy - nadirSy)/F = gy / (camH + gy*sinAlpha)
+  // Let dy = (sy - nadirSy)/F:
+  //   dy*(camH + gy*sinAlpha) = gy  →  dy*camH = gy*(1 - dy*sinAlpha)
+  //   gy = dy*camH / (1 - dy*sinAlpha)
+  // And: gx = (sx - nadirSx)/F * depth = (sx - nadirSx)/F * (camH + gy*sinAlpha)
+  function unproj(sx, sy) {
+    const dx = (sx - nadirSx) / F;
+    const dy = (sy - nadirSy) / F;
+    const denom = 1 - dy * sinAlpha;
+    if (Math.abs(denom) < 0.001) return null; // near horizon, skip
+    const gy = dy * camH / denom;
+    const depth = camH + gy * sinAlpha;
+    const gx = dx * depth;
+    return { gx, gy };
+  }
+
+  // Find ground extents by unprojecting all four canvas corners + edge midpoints,
+  // then pad by 40% to ensure coverage at any tilt.
+  const probePoints = [
+    [0,0],[W,0],[0,H],[W,H],
+    [W/2,0],[W/2,H],[0,H/2],[W,H/2],
+    [W/4,0],[3*W/4,0],[W/4,H],[3*W/4,H]
+  ];
+  let gxMin=Infinity, gxMax=-Infinity, gyMin=Infinity, gyMax=-Infinity;
+  for (const [sx,sy] of probePoints) {
+    const g = unproj(sx, sy);
+    if (!g) continue;
+    gxMin = Math.min(gxMin, g.gx); gxMax = Math.max(gxMax, g.gx);
+    gyMin = Math.min(gyMin, g.gy); gyMax = Math.max(gyMax, g.gy);
+  }
+  // Fallback / clamp to sane values
+  const pad = 0.5;
+  if (!isFinite(gxMin)) gxMin = -nadirSx / scale;
+  if (!isFinite(gxMax)) gxMax = (W - nadirSx) / scale;
+  if (!isFinite(gyMin)) gyMin = -nadirSy / scale;
+  if (!isFinite(gyMax)) gyMax = (H - nadirSy) / scale;
+  const gLeft   = gxMin - pad;
+  const gRight  = gxMax + pad;
+  const gTop    = gyMin - pad;
+  const gBottom = gyMax + pad;
+
+  const R = new Rand(seed);
+  fields = [];
+
+  // Scale row height to ground extent so density stays consistent
+  const groundH = gBottom - gTop;
+  const rowHScale = groundH / 2.0; // normalise against default ~2-unit span
+
+  const numRows = R.int(5, 8) + Math.round(rowHScale * 2);
+  const rowEdges = [gBottom];
+  for (let r = 0; r < numRows; r++) {
+    const rh = R.range(0.18, 0.42) * Math.max(1, rowHScale * 0.7);
+    const next = rowEdges[rowEdges.length - 1] - rh;
+    rowEdges.push(next);
+    if (next < gTop) break;
+  }
+
+  let nearestDist = Infinity, nearestField = null;
+
+  const groundW_actual = gRight - gLeft;
+  const colCountScale = Math.max(1, groundW_actual / 2.0);
+
+  for (let r = 0; r < rowEdges.length - 1; r++) {
+    const gy1 = rowEdges[r], gy0 = rowEdges[r + 1];
+    const numCols = R.int(3, 7) + Math.round((colCountScale - 1) * 1.5);
+    const rw = []; let tot = 0;
+    for (let c = 0; c < numCols; c++) { const w = R.range(0.2, 0.6); rw.push(w); tot += w; }
+    let gx = gLeft;
+    for (let c = 0; c < numCols; c++) {
+      const cw = (rw[c] / tot) * (gRight - gLeft);
+      const gx1 = gx + cw;
+      const cxc = (gx + gx1) / 2, cyc = (gy0 + gy1) / 2;
+      const dist = Math.sqrt(cxc * cxc + cyc * cyc);
+      const canBeMulti = cw > 0.3 && (gy1 - gy0) > 0.25;
+      const isMulti = canBeMulti && R.next() < multiFreq;
+      const numSub = isMulti ? R.pick([2, 2, 3, 4, 4]) : 0;
+      const f = {
+        gx0: gx, gy0, gx1, gy1, cxc, cyc, cw,
+        isMulti, numSub,
+        hasCircle: isMulti ? false : R.next() < density,
+        color: R.pick(PAL), color2: R.pick(PAL),
+        rg: Math.min(cw, gy1 - gy0) * 0.43,
+        dist,
+        pivotAngle: R.range(0, Math.PI * 2),
+        hasWedge: R.next() < 0.38,
+        wedgeStart: R.range(0, Math.PI * 2),
+        wedgeArc: R.range(Math.PI * 0.12, Math.PI * 0.65),
+        shapeType: R.pick(['rect','rect','rect','trapezoid','lshape','strip','strip']),
+        subCircles: isMulti ? subCircleLayout(gx, gy0, gx1, gy1, numSub, R).map(sc => ({
+          ...sc,
+          pivotAngle: R.range(0, Math.PI * 2),
+          hasWedge: R.next() < 0.35,
+          wedgeStart: R.range(0, Math.PI * 2),
+          wedgeArc: R.range(Math.PI * 0.1, Math.PI * 0.6)
+        })) : []
+      };
+      fields.push(f);
+      if (f.hasCircle && dist < nearestDist) { nearestDist = dist; nearestField = f; }
+      gx = gx1;
+    }
+  }
+  if (nearestField) nearestField.hasCircle = true;
+
+  for (const f of fields) {
+    const { gx0, gy0, gx1, gy1, cxc, cyc, rg, color, color2, shapeType } = f;
+    const corners = [proj(gx0,gy0), proj(gx1,gy0), proj(gx1,gy1), proj(gx0,gy1)];
+
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y);
+    ctx.closePath();
+    ctx.fillStyle = color; ctx.fill();
+
+    if (f.isMulti) {
+      const n = f.numSub;
+      ctx.strokeStyle = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+      ctx.lineWidth = 0.5;
+      if (n === 4 || (n === 2 && (gx1 - gx0) >= (gy1 - gy0))) {
+        const mx = (gx0 + gx1) / 2;
+        const a = proj(mx, gy0), b = proj(mx, gy1);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      if (n === 4 || (n === 2 && (gx1 - gx0) < (gy1 - gy0))) {
+        const my = (gy0 + gy1) / 2;
+        const a = proj(gx0, my), b = proj(gx1, my);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      if (n === 3) {
+        const mx = (gx0 + gx1) / 2, my = (gy0 + gy1) * 0.5;
+        const a = proj(mx, gy0), b = proj(mx, gy1);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        const c = proj(gx0, my), d = proj(gx1, my);
+        ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.stroke();
+      }
+    }
+
+    if (!f.hasCircle && !f.isMulti) {
+      if (shapeType === 'strip') {
+        for (let s = 0; s < 4; s++) {
+          const t0 = s / 4, t1 = (s + 0.48) / 4;
+          const ya = gy0 + (gy1 - gy0) * t0, yb = gy0 + (gy1 - gy0) * t1;
+          const pa = proj(gx0,ya), pb = proj(gx1,ya), pc = proj(gx1,yb), pd = proj(gx0,yb);
+          ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y); ctx.lineTo(pc.x,pc.y); ctx.lineTo(pd.x,pd.y);
+          ctx.closePath(); ctx.fillStyle = color2; ctx.fill();
+        }
+      } else if (shapeType === 'lshape') {
+        const mx = gx0 + (gx1 - gx0) * 0.55, my = gy0 + (gy1 - gy0) * 0.5;
+        const pts = [proj(gx0,gy0),proj(mx,gy0),proj(mx,my),proj(gx1,my),proj(gx1,gy1),proj(gx0,gy1)];
+        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+        pts.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.closePath(); ctx.fillStyle = color2; ctx.fill();
+      } else if (shapeType === 'trapezoid') {
+        const ins = 0.08;
+        const pts = [proj(gx0+ins,gy0), proj(gx1-ins,gy0), proj(gx1,gy1), proj(gx0,gy1)];
+        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+        pts.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.closePath(); ctx.fillStyle = color2; ctx.fill();
+      }
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y);
+    ctx.closePath();
+    ctx.strokeStyle = dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 0.7; ctx.stroke();
+
+    if (f.hasCircle) {
+      drawCircle(proj, cxc, cyc, rg, f.pivotAngle, f.hasWedge, f.wedgeStart, f.wedgeArc,
+        f === nearestField, doFill, doArms, dark);
+    }
+    if (f.isMulti) {
+      for (const sc of f.subCircles) {
+        drawCircle(proj, sc.cx, sc.cy, sc.rg, sc.pivotAngle, sc.hasWedge, sc.wedgeStart, sc.wedgeArc,
+          false, doFill, doArms, dark);
+      }
+    }
+  }
+
+  // Ponds
+  const R2 = new Rand(seed + 77);
+  for (let p = 0; p < R2.int(1, 3); p++) {
+    const gx = R2.range(gLeft * 0.7, gRight * 0.7);
+    const gy = R2.range(gTop * 0.7, gBottom * 0.7);
+    const cp = proj(gx, gy);
+    const rx = R2.range(6, 16), ry = R2.range(4, 10);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cp.x + rx, cp.y);
+    ctx.bezierCurveTo(cp.x+rx, cp.y-ry*1.1, cp.x-rx*0.3, cp.y-ry*1.3, cp.x-rx*0.8, cp.y-ry*0.5);
+    ctx.bezierCurveTo(cp.x-rx*1.2, cp.y+ry*0.4, cp.x-rx*0.4, cp.y+ry*1.1, cp.x+rx*0.3, cp.y+ry);
+    ctx.bezierCurveTo(cp.x+rx, cp.y+ry*0.3, cp.x+rx, cp.y+ry*0.1, cp.x+rx, cp.y);
+    ctx.closePath();
+    ctx.fillStyle = dark ? '#0c1820' : '#324e62';
+    ctx.globalAlpha = 0.72; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  if (showNadir) {
+    ctx.save();
+    ctx.strokeStyle = dark ? 'rgba(255,240,160,0.55)' : 'rgba(120,80,0,0.45)';
+    ctx.lineWidth = 0.75; ctx.setLineDash([4, 5]);
+    ctx.beginPath(); ctx.moveTo(nadirSx-14, nadirSy); ctx.lineTo(nadirSx+14, nadirSy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(nadirSx, nadirSy-14); ctx.lineTo(nadirSx, nadirSy+14); ctx.stroke();
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(nadirSx, nadirSy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = dark ? 'rgba(255,240,160,0.7)' : 'rgba(120,80,0,0.6)';
+    ctx.fill();
+  }
+
+  // Update seed display
+  document.getElementById('seedInput').value = seed;
+  const cc = fields.filter(f => f.hasCircle).length;
+  const mc = fields.filter(f => f.isMulti).length;
+  const sc = fields.filter(f => f.isMulti).reduce((a, f) => a + f.numSub, 0);
+  document.getElementById('info').textContent =
+    `${fields.length} fields · ${cc} single circles · ${mc} multi-blocks (${sc} sub-circles)`;
+}
+
+function draw() { buildAndDraw(); }
+function randomize() { seed = Math.floor(Math.random() * 999999); draw(); }
+function applySeed() { seed = parseInt(document.getElementById('seedInput').value, 10) || 0; draw(); }
+
+function exportPNG() {
+  const link = document.createElement('a');
+  link.download = `aerial_crop_seed${seed}.png`;
+  link.href = cv.toDataURL('image/png');
+  link.click();
+}
+
+function bind(id, suf, dec, labelFn) {
+  document.getElementById(id).addEventListener('input', function () {
+    const v = +this.value;
+    document.getElementById(id + '-v').textContent = labelFn ? labelFn(v) : (dec != null ? v.toFixed(dec) : v) + (suf || '');
+    draw();
+  });
+}
+
+bind('camH', '×', 2);
+bind('tilt', '', 2, tiltLabel);
+bind('nadirX', '', 2);
+bind('nadirY', '', 2);
+bind('warpAmt', '', 2);
+bind('density', '', 2);
+bind('multiFreq', '', 2);
+['tog-arms','tog-fill','tog-warp','tog-nadir'].forEach(id =>
+  document.getElementById(id).addEventListener('change', draw));
+
+document.getElementById('seedInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') applySeed();
+});
+
+window.addEventListener('resize', resize);
+resize();
+</script>
+</body>
+</html>
